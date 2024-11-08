@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
     // Connect and authenticate
     let client = IggyClientBuilder::new()
         .with_tcp()
-        .with_server_address("abjad.mayorana.ch:8090".to_string())
+        .with_server_address("iggy.mayorana.ch:8090".to_string())
         .build()?;
     client.connect().await?;
     client.login_user("iggy", "iggy").await?;
