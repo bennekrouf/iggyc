@@ -1,14 +1,16 @@
-mod consume_messages;
-mod consume_messages_and_email;
-use anyhow::Result;
-//use consume_messages::consume_messages;
-use consume_messages_and_email::{consume_messages_and_email, EmailConfig};
+mod config;
+mod messaging;
+mod email;
 
+use anyhow::Result;
 use iggy::client::{Client, UserClient};
 use iggy::clients::builder::IggyClientBuilder;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, Registry};
+use config::{smtp::SmtpConfig, email::EmailConfig};
+use email::sender::EmailSender;
+use messaging::consumer::MessageConsumer;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -23,21 +25,19 @@ async fn main() -> Result<()> {
         .with_tcp()
         .with_server_address("abjad.mayorana.ch:8090".to_string())
         .build()?;
-
     client.connect().await?;
     client.login_user("iggy", "iggy").await?;
 
-    let tenant = "gibro"; // Change this to match your tenant/stream
-    let topic = "notification";
+    // Initialize configurations
+    let smtp_config = SmtpConfig::from_env()?;
+    let email_config = EmailConfig::from_env();
+    let email_sender = EmailSender::new(&smtp_config, email_config)?;
 
-    //consume_messages(&client, tenant, topic).await?;
-    let email_config = EmailConfig {
-        from_email: "mb@mayorana.ch".to_string(),
-        to_email: "mohamed.bennekrouf@gmail.com".to_string(),
-        subject: "New Message Notification".to_string(),
-        body: "".to_string(), // Body is constructed from the message
-    };
+    // Setup consumer with client and email sender
+    let consumer = MessageConsumer::new(client, email_sender);
 
-    consume_messages_and_email(&client, tenant, topic, email_config).await?;
+    // Start consuming messages
+    consumer.consume_messages("gibro", "notification").await?;
+
     Ok(())
 }
